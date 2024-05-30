@@ -46,6 +46,8 @@ DMA_HandleTypeDef hdma_adc1;
 
 SPI_HandleTypeDef hspi1;
 
+TIM_HandleTypeDef htim1;
+
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -56,6 +58,7 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -96,25 +99,31 @@ int main(void)
   MX_DMA_Init();
   MX_ADC1_Init();
   MX_SPI1_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
 
-  /*
-  uint32_t value_adc = 0;
+  /* ADC INIT
+  uint32_t adc_value = 0;
   HAL_ADCEx_Calibration_Start(&hadc1);
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&value_adc, 1);
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&adc_value, 1);
   */
 
-  uint8_t tx_address[5] = {0xEE, 0xDD, 0xCC, 0xBB, 0xAA};
-  const uint8_t channel = 10;
-  HAL_Delay(11);
+  HAL_TIM_Base_Start(&htim1);
+
+  uint8_t TX_ADDRESS[5] = {0xEE, 0xDD, 0xCC, 0xBB, 0xAA};
+  const uint8_t CHANNEL = 1;
+
+  HAL_Delay(100);
   nrf24_reset(&hspi1);
   nrf24_init(&hspi1);
-  nrf24_set_tx_mode(&hspi1, channel, tx_address);
+  nrf24_set_tx_mode(CHANNEL, TX_ADDRESS);
+  HAL_Delay(100);
 
   NRF24_StateTypeDef state;
-  nrf24_read_state(&hspi1, &state);
+  nrf24_read_state(&state);
 
-  char payload[32] = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+  uint8_t payload[33] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32};
+  HAL_StatusTypeDef tx_spi_status;
 
   /* USER CODE END 2 */
 
@@ -125,9 +134,13 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	//uint8_t cfg = nrf24_read_reg(&hspi1, NRF24_CONFIG_REG);
-	HAL_Delay(1);
-	nrf24_read_state(&hspi1, &state);
+	tx_spi_status = nrf24_transmit(payload, 32);
+	//HAL_Delay(1);
+	// catch failed spi transmit
+	if (tx_spi_status != HAL_OK) {
+		HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+		HAL_Delay(3000);
+	}
   }
   /* USER CODE END 3 */
 }
@@ -245,7 +258,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -257,6 +270,52 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 72-1;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 0xffff-1;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
 
 }
 
