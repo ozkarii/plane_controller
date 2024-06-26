@@ -60,10 +60,24 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LED1_Pin GPIO_PIN_13
 #define LED1_GPIO_Port GPIOC
+#define LCD_EN_Pin GPIO_PIN_2
+#define LCD_EN_GPIO_Port GPIOA
 #define NRF24_CE_Pin GPIO_PIN_0
 #define NRF24_CE_GPIO_Port GPIOB
 #define NRF24_CSN_Pin GPIO_PIN_1
 #define NRF24_CSN_GPIO_Port GPIOB
+#define LCD_RW_Pin GPIO_PIN_10
+#define LCD_RW_GPIO_Port GPIOB
+#define LCD_RS_Pin GPIO_PIN_11
+#define LCD_RS_GPIO_Port GPIOB
+#define LCD_DB4_Pin GPIO_PIN_12
+#define LCD_DB4_GPIO_Port GPIOB
+#define LCD_DB5_Pin GPIO_PIN_13
+#define LCD_DB5_GPIO_Port GPIOB
+#define LCD_DB6_Pin GPIO_PIN_14
+#define LCD_DB6_GPIO_Port GPIOB
+#define LCD_DB7_Pin GPIO_PIN_15
+#define LCD_DB7_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

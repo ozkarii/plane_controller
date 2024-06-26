@@ -47,7 +47,7 @@ HAL_StatusTypeDef nrf24_write_reg_mb(uint8_t reg, uint8_t* data, uint8_t size)
 
 	nrf24_set_CSN_low();
 	HAL_StatusTypeDef retval = HAL_SPI_TransmitReceive(&hspi1, &cmd, &status, 1, 100);
-	if (retval != HAL_OK) {
+	if (retval == HAL_OK) {
 		retval = HAL_SPI_TransmitReceive(&hspi1, data, response, size, 200);
 	}
 	nrf24_set_CSN_high();
@@ -74,7 +74,7 @@ HAL_StatusTypeDef nrf24_read_reg_mb(uint8_t reg, uint8_t size, uint8_t* output)
 
 	nrf24_set_CSN_low();
 	HAL_StatusTypeDef retval = HAL_SPI_TransmitReceive(&hspi1, &reg, &status, 1, 100);
-	if (retval != HAL_OK) {
+	if (retval == HAL_OK) {
 		retval = HAL_SPI_Receive(&hspi1, output, size, 200);
 	}
 	nrf24_set_CSN_high();
@@ -237,11 +237,14 @@ void nrf24_set_rx_mode(uint8_t channel, uint8_t* address, uint8_t pipe)
 HAL_StatusTypeDef nrf24_transmit(uint8_t* data, uint8_t size)
 {
 	uint8_t cmd = NRF24_W_TX_PAYLOAD;
+	uint8_t tmp[32];
 
 	nrf24_set_CSN_low();
-	HAL_StatusTypeDef spi_status = HAL_SPI_Transmit(&hspi1, &cmd, 1, 100);
+	HAL_StatusTypeDef spi_status = HAL_SPI_TransmitReceive(&hspi1, &cmd, tmp, 1, 100);
+	while (hspi1.State != HAL_SPI_STATE_READY);
 	if (spi_status == HAL_OK) {
-		spi_status = HAL_SPI_Transmit(&hspi1, data, size, 200);
+		spi_status = HAL_SPI_TransmitReceive(&hspi1, data, tmp, size, 200);
+		while (hspi1.State != HAL_SPI_STATE_READY);
 	}
 	nrf24_set_CSN_high();
 
@@ -249,12 +252,13 @@ HAL_StatusTypeDef nrf24_transmit(uint8_t* data, uint8_t size)
 	uint8_t fifo_status = nrf24_read_reg(NRF24_FIFO_STATUS_REG);
 	if ( (fifo_status >> 6) & 0b1 ) {
 		HAL_Delay(1);
-	}*/
+	}
 
 	if (spi_status != HAL_OK) {
 		nrf24_flush_tx_fifo();
 		return spi_status;
 	}
+	*/
 
 	nrf24_set_CE_high();
 	delay_us(30);
@@ -262,11 +266,13 @@ HAL_StatusTypeDef nrf24_transmit(uint8_t* data, uint8_t size)
 
 	delay_us(400); // PLL lock + TX delay + 100 us
 
+	/*
 	uint8_t fifo_status = nrf24_read_reg(NRF24_FIFO_STATUS_REG);
 	// flush tx fifo if it's not empty
 	if ( !((fifo_status >> 4) & 0b1) ) {
 		nrf24_flush_tx_fifo();
 	}
+	*/
 
 	return spi_status;
 }
