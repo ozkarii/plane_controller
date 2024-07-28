@@ -4,16 +4,26 @@
 #ifndef NRF24L01_H
 #define NRF24L01_H
 
+/* MODIFY THIS */
+
 #include "stm32f1xx_hal.h"
 
 extern SPI_HandleTypeDef hspi1; // SPI handle to be used
+#define SPI_HANDLE hspi1
+
 extern TIM_HandleTypeDef htim1; // Timer handle to be used (1MHz)
+#define TIMER_HANDLE_1MHZ htim1
+
 
 // Pins
-#define NRF24_CE_Pin             GPIO_PIN_0
+#define NRF24_CE_Pin             GPIO_PIN_6
 #define NRF24_CE_GPIO_Port       GPIOB
-#define NRF24_CSN_Pin            GPIO_PIN_1
+#define NRF24_CSN_Pin            GPIO_PIN_7
 #define NRF24_CSN_GPIO_Port      GPIOB
+
+/* MODIFY THIS END */
+
+#define SPI_TIMEOUT 100
 
 // Registers, datasheet pages 54-59
 #define NRF24_CONFIG_REG         0x00
@@ -51,7 +61,7 @@ extern TIM_HandleTypeDef htim1; // Timer handle to be used (1MHz)
 #define NRF24_FLUSH_TX              0b11100001
 #define NRF24_FLUSH_RX              0b11100010
 #define NRF24_REUSE_TX_PL           0b11100011
-#define NRF24_ACTIVATE				0b01010000
+#define NRF24_ACTIVATE							0b01010000
 #define NRF24_R_RX_PL_WID           0b01100000
 #define NRF24_W_ACK_PAYLOAD         0b10101000	// 0b10101PPP
 #define NRF24_W_TX_PAYLOAD_NO_ACK   0b10110000
@@ -98,37 +108,6 @@ typedef enum {
 	PA_minus6dbm = 0b100,
 	PA_0dbm = 0b110
 } NRF24_PA_Level;
-
-
-/**
- * @brief Sets CE high
- */
-void nrf24_set_CE_high();
-
-/**
- * @brief Sets CE low
- */
-void nrf24_set_CE_low();
-
-/**
- * @brief Sets CSN high
- */
-void nrf24_set_CSN_high();
-
-/**
- * @brief Sets CSN low
- */
-void nrf24_set_CSN_low();
-
-/**
- * @brief Creates a delay given in microseconds
- * 
- * @param microseconds delay in microseconds
- * 
- * @note This function uses timer handle htim1, which is assumed to be
- * 1MHz and count until 65535.
- */
-void delay_us(uint16_t microseconds);
 
 /**
  * @brief Writes the given data to the given register
@@ -209,9 +188,18 @@ void nrf24_set_rx_mode(uint8_t channel, uint8_t* address, uint8_t pipe);
  * 
  * @param data trasmitted data
  * @param size size of the data in bytes
- * @return STATUS register content after transmission
  */
-HAL_StatusTypeDef nrf24_transmit(uint8_t* data, uint8_t size);
+void nrf24_transmit(uint8_t* data, uint8_t size);
+
+/**
+ * @brief Attempt to receive data from the given pipe until RX FIFO is empty.
+ *
+ * @param pipe RX pipe number
+ * @param data buffer where received data is put
+ * @param size size of data to be received
+ * @return 1 if data was received, 0 if no data was available
+ */
+uint8_t nrf24_receive(uint8_t pipe, uint8_t* data, uint8_t size);
 
 /**
  * @brief Sends a command to the device which does not require any data
@@ -235,17 +223,5 @@ void nrf24_open_rx_pipe(uint8_t pipe);
  */
 void nrf24_set_pa_level(NRF24_PA_Level level);
 
-/**
- * @brief Enables dynamic payload length
- * 
- * @note ACTIVATE command must be sent before this function.
- * It is sent in nrf24_init()
- */
-void nrf24_enable_dyn_payload_len();
-
-/**
- *
- */
-void nrf24_flush_tx_fifo();
 
 #endif

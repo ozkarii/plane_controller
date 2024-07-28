@@ -1,31 +1,51 @@
 #include "nRF24L01.h"
 
+/**
+ * @brief Creates a delay given in microseconds
+ *
+ * @param microseconds delay in microseconds
+ *
+ * @note This function uses timer handle htim1, which is assumed to be
+ * 1MHz and count until 65535.
+ */
+static inline void delay_us(uint16_t microseconds)
+{
+	__HAL_TIM_SET_COUNTER(&TIMER_HANDLE_1MHZ, 0);
+	while (__HAL_TIM_GET_COUNTER(&TIMER_HANDLE_1MHZ) < microseconds);
+}
 
-void nrf24_set_CE_high()
+/**
+ * @brief Sets CE high
+ */
+static inline void nrf24_set_CE_high()
 {
     HAL_GPIO_WritePin(NRF24_CE_GPIO_Port, NRF24_CE_Pin, 1);
 }
 
-void nrf24_set_CE_low()
+/**
+ * @brief Sets CE low
+ */
+static inline void nrf24_set_CE_low()
 {
     HAL_GPIO_WritePin(NRF24_CE_GPIO_Port, NRF24_CE_Pin, 0);
 }
 
-void nrf24_set_CSN_high()
+/**
+ * @brief Sets CSN high
+ */
+static inline void nrf24_set_CSN_high()
 {
     HAL_GPIO_WritePin(NRF24_CSN_GPIO_Port, NRF24_CSN_Pin, 1);
 }
 
-void nrf24_set_CSN_low()
+/**
+ * @brief Sets CSN low
+ */
+static inline void nrf24_set_CSN_low()
 {
     HAL_GPIO_WritePin(NRF24_CSN_GPIO_Port, NRF24_CSN_Pin, 0);
 }
 
-void delay_us(uint16_t microseconds)
-{
-	__HAL_TIM_SET_COUNTER(&htim1, 0);
-	while (__HAL_TIM_GET_COUNTER(&htim1) < microseconds);
-}
 
 HAL_StatusTypeDef nrf24_write_reg(uint8_t reg, uint8_t data)
 {
@@ -33,7 +53,7 @@ HAL_StatusTypeDef nrf24_write_reg(uint8_t reg, uint8_t data)
     uint8_t status[2] = {0xFF, 0xFF};
 
     nrf24_set_CSN_low();
-    HAL_StatusTypeDef retval = HAL_SPI_TransmitReceive(&hspi1, buffer, status, 2, 100);
+    HAL_StatusTypeDef retval = HAL_SPI_TransmitReceive(&SPI_HANDLE, buffer, status, 2, SPI_TIMEOUT);
     nrf24_set_CSN_high();
 
     return retval;
@@ -46,9 +66,9 @@ HAL_StatusTypeDef nrf24_write_reg_mb(uint8_t reg, uint8_t* data, uint8_t size)
     uint8_t response[size];
 
 	nrf24_set_CSN_low();
-	HAL_StatusTypeDef retval = HAL_SPI_TransmitReceive(&hspi1, &cmd, &status, 1, 100);
+	HAL_StatusTypeDef retval = HAL_SPI_TransmitReceive(&SPI_HANDLE, &cmd, &status, 1, SPI_TIMEOUT);
 	if (retval == HAL_OK) {
-		retval = HAL_SPI_TransmitReceive(&hspi1, data, response, size, 200);
+		retval = HAL_SPI_TransmitReceive(&SPI_HANDLE, data, response, size, SPI_TIMEOUT);
 	}
 	nrf24_set_CSN_high();
 
@@ -62,7 +82,7 @@ uint8_t nrf24_read_reg(uint8_t reg)
 	uint8_t data[2] = {0xFF, 0xFF};
 
 	nrf24_set_CSN_low();
-	HAL_SPI_TransmitReceive(&hspi1, cmd, data, 2, 100);
+	HAL_SPI_TransmitReceive(&SPI_HANDLE, cmd, data, 2, SPI_TIMEOUT);
 	nrf24_set_CSN_high();
 
 	return data[1];
@@ -73,9 +93,9 @@ HAL_StatusTypeDef nrf24_read_reg_mb(uint8_t reg, uint8_t size, uint8_t* output)
 	uint8_t status = 0xFF;
 
 	nrf24_set_CSN_low();
-	HAL_StatusTypeDef retval = HAL_SPI_TransmitReceive(&hspi1, &reg, &status, 1, 100);
+	HAL_StatusTypeDef retval = HAL_SPI_TransmitReceive(&SPI_HANDLE, &reg, &status, 1, SPI_TIMEOUT);
 	if (retval == HAL_OK) {
-		retval = HAL_SPI_Receive(&hspi1, output, size, 200);
+		retval = HAL_SPI_Receive(&SPI_HANDLE, output, size, SPI_TIMEOUT);
 	}
 	nrf24_set_CSN_high();
 
@@ -88,7 +108,7 @@ HAL_StatusTypeDef nrf24_init()
 
 	// Activate cmd to enable FEATURE register
 	uint8_t activate_cmd[2] = {NRF24_ACTIVATE, 0x73};
-	HANDLE_SPI_ERROR(HAL_SPI_Transmit(&hspi1, activate_cmd, 2, 100));
+	HANDLE_SPI_ERROR(HAL_SPI_Transmit(&SPI_HANDLE, activate_cmd, 2, SPI_TIMEOUT));
 
 	// Disable auto-acknowledgment
 	HANDLE_SPI_ERROR(nrf24_write_reg(NRF24_EN_AA_REG, 0));
@@ -108,7 +128,7 @@ HAL_StatusTypeDef nrf24_init()
 	// Set channel 2 (reset value)
 	HANDLE_SPI_ERROR(nrf24_write_reg(NRF24_RF_CH_REG, 2));
 
-	// Data rate 2Mbps, power 0dBm
+	// Data rate 2Mbps, power 0dBm, LNA gain
 	HANDLE_SPI_ERROR(nrf24_write_reg(NRF24_RF_SETUP_REG, 0b00001111));
 
 	return HAL_OK;
@@ -152,7 +172,6 @@ void nrf24_reset()
 	nrf24_write_reg(NRF24_FIFO_STATUS_REG, 0x11);
 	nrf24_write_reg(NRF24_DYNPD_REG, 0);
 	nrf24_write_reg(NRF24_FEATURE_REG, 0);
-
 }
 
 void nrf24_read_state(NRF24_StateTypeDef* state) {
@@ -195,8 +214,9 @@ void nrf24_set_tx_mode(uint8_t channel, uint8_t* address)
 	nrf24_write_reg(NRF24_RF_CH_REG, channel);
 	nrf24_write_reg_mb(NRF24_TX_ADDR_REG, address, 5);
 	uint8_t config = nrf24_read_reg(NRF24_CONFIG_REG);
-	config &= 0b11111110;  // ptx mode
-	config |= 0b10;  // power up
+	config &= 0b11111110;		// ptx mode
+	config |= 0b10;					// power up
+	config |= 0b1010000; 		// disable RX_DR and MAX_RT interrupts
 	nrf24_write_reg(NRF24_CONFIG_REG, config);
 	HAL_Delay(2);
 }
@@ -226,39 +246,31 @@ void nrf24_set_rx_mode(uint8_t channel, uint8_t* address, uint8_t pipe)
 	// TODO: handle dynamic payload length
 	nrf24_write_reg(pipe_size_reg, 32);
 
+	nrf24_write_reg(NRF24_RF_CH_REG, channel); // set channel
 
 	uint8_t config = nrf24_read_reg(NRF24_CONFIG_REG);
-	config |= 0b11;  // prx mode and power up
+	config |= 0b110000; // disable TX_DS and MAX_RT interrupts
+	config |= 0b10;  // power up
 	nrf24_write_reg(NRF24_CONFIG_REG, config);
 	HAL_Delay(2);
-	//nrf24_set_CE_high();
+	config |= 0b11; // PRX mode
+	nrf24_write_reg(NRF24_CONFIG_REG, config);
+	while (SPI_HANDLE.State != HAL_SPI_STATE_READY);
+	nrf24_set_CE_high();
+	delay_us(130);
 }
 
-HAL_StatusTypeDef nrf24_transmit(uint8_t* data, uint8_t size)
+void nrf24_transmit(uint8_t* data, uint8_t size)
 {
 	uint8_t cmd = NRF24_W_TX_PAYLOAD;
-	uint8_t tmp[32];
+	uint8_t status = 0;
 
 	nrf24_set_CSN_low();
-	HAL_StatusTypeDef spi_status = HAL_SPI_TransmitReceive(&hspi1, &cmd, tmp, 1, 100);
-	while (hspi1.State != HAL_SPI_STATE_READY);
-	if (spi_status == HAL_OK) {
-		spi_status = HAL_SPI_TransmitReceive(&hspi1, data, tmp, size, 200);
-		while (hspi1.State != HAL_SPI_STATE_READY);
-	}
+	HAL_SPI_TransmitReceive_IT(&SPI_HANDLE, &cmd, &status, 1);
+	while (SPI_HANDLE.State != HAL_SPI_STATE_READY);
+	HAL_SPI_Transmit_IT(&SPI_HANDLE, data, size);
+	while (SPI_HANDLE.State != HAL_SPI_STATE_READY);
 	nrf24_set_CSN_high();
-
-	/* Check if fifo full debug (it never is)
-	uint8_t fifo_status = nrf24_read_reg(NRF24_FIFO_STATUS_REG);
-	if ( (fifo_status >> 6) & 0b1 ) {
-		HAL_Delay(1);
-	}
-
-	if (spi_status != HAL_OK) {
-		nrf24_flush_tx_fifo();
-		return spi_status;
-	}
-	*/
 
 	nrf24_set_CE_high();
 	delay_us(30);
@@ -266,22 +278,52 @@ HAL_StatusTypeDef nrf24_transmit(uint8_t* data, uint8_t size)
 
 	delay_us(400); // PLL lock + TX delay + 100 us
 
-	/*
+	/* Flush TX FIFO if it's not empty */
 	uint8_t fifo_status = nrf24_read_reg(NRF24_FIFO_STATUS_REG);
-	// flush tx fifo if it's not empty
-	if ( !((fifo_status >> 4) & 0b1) ) {
-		nrf24_flush_tx_fifo();
+	if ( !((fifo_status >> 4) & 1) ) {
+		nrf24_send_command(NRF24_FLUSH_TX);
 	}
-	*/
 
-	return spi_status;
+	nrf24_write_reg(NRF24_STATUS_REG, status |= (1<<5)); // clear interrupt
+}
+
+uint8_t nrf24_receive(uint8_t pipe, uint8_t* data, uint8_t size)
+{
+	uint8_t status = 0;
+
+	// Check if received pipe is correct
+	if (((status >> 1) & 0x7) != pipe) {
+		return 0;
+	}
+
+	uint8_t fifo_status = nrf24_read_reg(NRF24_FIFO_STATUS_REG);
+	// Check if rx fifo empty
+	if (fifo_status & 1) {
+		return 0;
+	}
+
+	uint8_t cmd = NRF24_R_RX_PAYLOAD;
+
+	while (!(fifo_status & 1))
+	{
+		nrf24_set_CSN_low();
+		HAL_SPI_TransmitReceive_IT(&SPI_HANDLE, &cmd, &status, 1);
+		while (SPI_HANDLE.State != HAL_SPI_STATE_READY);
+		HAL_SPI_Receive_IT(&SPI_HANDLE, data, size);
+		while (SPI_HANDLE.State != HAL_SPI_STATE_READY);
+		nrf24_set_CSN_high();
+		nrf24_write_reg(NRF24_STATUS_REG, status |= (1<<6)); // clear interrupt
+		fifo_status = nrf24_read_reg(NRF24_FIFO_STATUS_REG);
+	}
+
+	return 1;
 }
 
 void nrf24_send_command(uint8_t cmd)
 {
 	uint8_t response = 0xFF;
 	nrf24_set_CSN_low();
-	HAL_SPI_TransmitReceive(&hspi1, &cmd, &response, 1, 100);
+	HAL_SPI_TransmitReceive(&SPI_HANDLE, &cmd, &response, 1, SPI_TIMEOUT);
 	nrf24_set_CSN_high();
 }
 
@@ -299,14 +341,4 @@ void nrf24_set_pa_level(NRF24_PA_Level level)
 {
 	uint8_t current_rf_setup = nrf24_read_reg(NRF24_RF_SETUP_REG);
 	nrf24_write_reg(NRF24_RF_SETUP_REG, current_rf_setup | level);
-}
-
-void nrf24_enable_dyn_payload_len()
-{
-	uint8_t current_feature_reg = nrf24_read_reg(NRF24_FEATURE_REG);
-	nrf24_write_reg(NRF24_FEATURE_REG, (current_feature_reg | 0b100));
-}
-
-void nrf24_flush_tx_fifo() {
-	nrf24_send_command(NRF24_FLUSH_TX);
 }

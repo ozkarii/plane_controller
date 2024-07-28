@@ -6,43 +6,7 @@
 #define LCD_RETURN_HOME 0x02
 #define LCD_ON_NO_CURSOR 0x0C
 #define LCD_LENGTH 16
-
-/**
- * @brief Set the Register Select pin high
- */
-void lcd_set_rs_high();
-
-/**
- * @brief Set the Register Select pin low
- */
-void lcd_set_rs_low();
-
-/**
- * @brief Set the Enable pin high
- */
-void lcd_set_en_high();
-
-/**
- * @brief Set the Enable pin low
- */
-void lcd_set_en_low();
-
-/**
- * @brief Set the Read/Write pin low for write mode
- */
-void lcd_set_rw_low();
-
-/**
- * @brief Set the Read/Write pin high for read mode
- */
-void lcd_set_rw_high();
-
-/**
- * @brief Pulse the Enable pin for specified time
- * 
- * @param delay Pulse time in ms
- */
-void lcd_pulse_en(uint16_t delay);
+#define LCD_LENGTH_HALF 8
 
 /**
  * @brief Write data to the LCD in 4-bit mode
